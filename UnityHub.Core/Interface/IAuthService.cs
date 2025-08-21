@@ -12,5 +12,6 @@ namespace UnityHub.Core.Interface
         Task<Response> VerifyTwoFactorCodeAsync(string email, string code);
         Task<Response> ForgotPassword(ForgotPassword email);
         Task<Response> ResetPassword(ResetPassword resetPassword);
+        Task<Response> ChangeUserPassword(ChangeUserPassword changeUserPassword);
     }
 }

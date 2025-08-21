@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using UnityHub.Core.Interface;
 using UnityHub.API.Authentication;
+using Microsoft.AspNetCore.Authorization;
 
 namespace UnityHub.API.Controllers
 {
@@ -140,6 +141,35 @@ namespace UnityHub.API.Controllers
                 return BadRequest(response);
             }
             catch ( Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    Status = "Error",
+                    ex.Message
+                });
+            }
+        }
+
+        [HttpPost("Change-User-Password")]
+        public async Task<IActionResult> ChangeUserPassword([FromBody] ChangeUserPasswordModel changeUserPasswordModel)
+        {
+            try
+            {
+                var changeUserPassword = new UnityHub.Core.Models.ChangeUserPassword
+                {
+                    OldPassword = changeUserPasswordModel.OldPassword,
+                    NewPassword = changeUserPasswordModel.NewPassword,
+                    ConfirmNewPassword = changeUserPasswordModel.ConfirmNewPassword,
+                    Email = changeUserPasswordModel.Email
+                };
+                var response = await _authService.ChangeUserPassword(changeUserPassword);
+                if (response.Status == "Success")
+                {
+                    return Ok(response);
+                }
+                return BadRequest(response);
+            }
+            catch (Exception ex)
             {
                 return StatusCode(500, new
                 {

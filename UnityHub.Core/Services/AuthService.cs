@@ -158,5 +158,33 @@ namespace UnityHub.Core.Services
                 };
             }
         }
+
+        public async Task<Response> ChangeUserPassword(ChangeUserPassword changeUserPassword)
+        {
+            try
+            {
+                var changePasswordModel = new UnityHub.Infrastructure.Models.ChangeUserPassword
+                {
+                    OldPassword = changeUserPassword.OldPassword,
+                    NewPassword = changeUserPassword.NewPassword,
+                    ConfirmNewPassword = changeUserPassword.ConfirmNewPassword,
+                    Email = changeUserPassword.Email
+                };
+                var response = await _authRepository.ChangeUserPassword(changePasswordModel);
+                return new Response
+                {
+                    Status = response.Status,
+                    Message = response.Message
+                };
+            }
+            catch (Exception ex)
+            {
+                return new Response
+                {
+                    Status = "Error",
+                    Message = $"An error occurred while changing the password: {ex.Message}"
+                };
+            }
+        }
     }
 }

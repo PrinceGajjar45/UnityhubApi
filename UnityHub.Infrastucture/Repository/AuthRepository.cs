@@ -451,5 +451,88 @@ namespace UnityHub.Infrastructure.Repository
                 };
             }
         }
+
+        public async Task<Response> ChangeUserPassword(ChangeUserPassword changeUserPassword)
+        {
+            try
+            {
+
+                if (string.IsNullOrWhiteSpace(changeUserPassword.Email))
+                {
+                    return new Response
+                    {
+                        Status = "Error",
+                        Message = "Email is required"
+                    };
+                }
+                if (string.IsNullOrWhiteSpace(changeUserPassword.OldPassword))
+                {
+                    return new Response
+                    {
+                        Status = "Error",
+                        Message = "Old Password is required"
+                    };
+                }
+                if (string.IsNullOrWhiteSpace(changeUserPassword.NewPassword))
+                {
+                    return new Response
+                    {
+                        Status = "Error",
+                        Message = "New Password is required"
+                    };
+                }
+                if (string.IsNullOrWhiteSpace(changeUserPassword.ConfirmNewPassword))
+                {
+                    return new Response
+                    {
+                        Status = "Error",
+                        Message = "Confirm New Password is required"
+                    };
+                }
+
+                var user = await _userManager.FindByEmailAsync(changeUserPassword.Email);
+                if (user == null)
+                {
+                    return new Response
+                    {
+                        Status = "Error",
+                        Message = "User not found"
+                    };
+                }
+                
+                if (changeUserPassword.NewPassword != changeUserPassword.ConfirmNewPassword)
+                {
+                    return new Response
+                    {
+                        Status = "Error",
+                        Message = "New password and confirm password do not match"
+                    };
+                }
+
+                var result = await _userManager.ChangePasswordAsync(user, changeUserPassword.OldPassword, changeUserPassword.NewPassword);
+                if (result.Succeeded)
+                {
+                    return new Response
+                    {
+                        Status = "Success",
+                        Message = "Password changed successfully"
+                    };
+                }
+
+                return new Response
+                {
+                    Status = "Error",
+                    Message = "Change password functionality is not implemented yet"
+                };
+            }
+            catch (Exception ex)
+            {
+                return new Response
+                {
+                    Status = "Error",
+                    Message = $"An error occurred while changing password: {ex.Message}"
+                };
+            }
+        }
     }
 }
