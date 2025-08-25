@@ -1,7 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using UnityHub.Core.Models;
 using UnityHub.Core.ServiceModel;
-using System.Threading.Tasks;
-using UnityHub.Core.Models;
 
 namespace UnityHub.Core.Interface
 {
@@ -13,5 +11,7 @@ namespace UnityHub.Core.Interface
         Task<Response> ForgotPassword(ForgotPassword email);
         Task<Response> ResetPassword(ResetPassword resetPassword);
         Task<Response> ChangeUserPassword(ChangeUserPassword changeUserPassword);
+        Task<Response> ReSentVerificationCode(ReSentVerificationCode reSentVerification);
+
     }
 }

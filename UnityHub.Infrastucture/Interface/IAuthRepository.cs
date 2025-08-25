@@ -1,4 +1,3 @@
-using System.Threading.Tasks;
 using UnityHub.Infrastructure.Models;
 using Response = UnityHub.Infrastructure.Models.Response;
 
@@ -12,5 +11,6 @@ namespace UnityHub.Infrastructure.Interface
         Task<Response> ForgotPassword(ForgotPassword email);
         Task<Response> ResetPassword(ResetPassword resetPassword);
         Task<Response> ChangeUserPassword(ChangeUserPassword changeUserPassword);
+        Task<Response> ReSentVerificationCode(ReSentVerificationCode reSentVerification);
     }
 }

@@ -1,11 +1,10 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace UnityHub.Infrastructure.Models
+namespace UnityHub.Core.Models
 {
-    public class ForgotPassword
+    public class ReSentVerificationCode
     {
         [Required]
-        [EmailAddress]
         public string Email { get; set; }
     }
 }

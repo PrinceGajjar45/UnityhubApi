@@ -1,8 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.WebUtilities;
-using System.Text;
-using System.Threading.Tasks;
-using UnityHub.Core.Interface;
+﻿using UnityHub.Core.Interface;
 using UnityHub.Core.Models;
 using UnityHub.Core.ServiceModel;
 using UnityHub.Infrastructure.Interface;
@@ -54,9 +50,16 @@ namespace UnityHub.Core.Services
                 var registerModel = new UnityHub.Infrastructure.Models.RegisterModel
                 {
                     Username = model.Username,
+                    FirstName = model.FirstName,
+                    LastName = model.LastName,
+                    PhoneNumber = model.PhoneNumber,
+                    IsServiceProvider = model.IsServiceProvider,
+                    Location = model.Location,
+                    ProfileUrl = model.ProfileUrl,
                     Email = model.Email,
                     Password = model.Password,
                     ConfirmPassword = model.ConfirmPassword
+
                 };
                 var response = await _authRepository.Register(registerModel);
                 var data = new Response
@@ -74,6 +77,34 @@ namespace UnityHub.Core.Services
                 {
                     Status = "Error",
                     Message = $"An error occurred during registration: {ex.Message}"
+                };
+            }
+        }
+
+        public async Task<Response> ReSentVerificationCode(ReSentVerificationCode reSentVerification)
+        {
+            try
+            {
+                var requestModel = new UnityHub.Infrastructure.Models.ReSentVerificationCode
+                {
+                    Email = reSentVerification.Email
+                };
+                var response = await _authRepository.ReSentVerificationCode(requestModel);
+                var data = new Response
+                {
+                    Status = response.Status,
+                    Message = response.Message,
+                    Token = response.Token,
+                    Expiration = response.Expiration
+                };
+                return data;
+            }
+            catch (Exception ex)
+            {
+                return new Response
+                {
+                    Status = "Error",
+                    Message = $"An error occurred during resent code: {ex.Message}"
                 };
             }
         }
@@ -119,7 +150,7 @@ namespace UnityHub.Core.Services
                     Message = result.Message
                 };
             }
-            catch (Exception ex)
+            catch (Exception)
             {
 
                 return new Response
@@ -136,10 +167,10 @@ namespace UnityHub.Core.Services
             {
                 var resetPasswordModel = new UnityHub.Infrastructure.Models.ResetPassword
                 {
-                       Password = resetPassword.Password,
-                       ConfirmPassword = resetPassword.ConfirmPassword,
-                       Token = resetPassword.Token,
-                       Email = resetPassword.Email
+                    Password = resetPassword.Password,
+                    ConfirmPassword = resetPassword.ConfirmPassword,
+                    Token = resetPassword.Token,
+                    Email = resetPassword.Email
                 };
 
                 var response = await _authRepository.ResetPassword(resetPasswordModel);
@@ -149,7 +180,7 @@ namespace UnityHub.Core.Services
                     Message = response.Message
                 };
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return new Response
                 {
@@ -186,5 +217,6 @@ namespace UnityHub.Core.Services
                 };
             }
         }
+
     }
 }

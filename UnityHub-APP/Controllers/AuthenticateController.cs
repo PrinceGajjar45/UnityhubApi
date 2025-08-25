@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using UnityHub.Core.Interface;
 using UnityHub.API.Authentication;
-using Microsoft.AspNetCore.Authorization;
+using UnityHub.Core.Interface;
 
 namespace UnityHub.API.Controllers
 {
@@ -51,11 +50,43 @@ namespace UnityHub.API.Controllers
                 var registerModel = new UnityHub.Core.Models.RegisterModel
                 {
                     Username = model.Username,
+                    FirstName = model.FirstName,
+                    LastName = model.LastName,
+                    PhoneNumber = model.PhoneNumber,
+                    IsServiceProvider = model.IsServiceProvider,
+                    Location = model.Location,
+                    ProfileUrl = model.ProfileUrl,
                     Email = model.Email,
                     Password = model.Password,
                     ConfirmPassword = model.ConfirmPassword
                 };
                 var response = await _authService.RegisterAsync(registerModel);
+                if (response.Status == "Success")
+                {
+                    return Ok(response);
+                }
+                return BadRequest(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    Status = "Error",
+                    ex.Message
+                });
+            }
+        }
+
+        [HttpPatch("ReSent-Verification-Code")]
+        public async Task<IActionResult> ReSentVerificationCode([FromBody] ReSentVerificationCode reSentVerification)
+        {
+            try
+            {
+                var requestModel = new UnityHub.Core.Models.ReSentVerificationCode
+                {
+                    Email = reSentVerification.Email
+                };
+                var response = await _authService.ReSentVerificationCode(requestModel);
                 if (response.Status == "Success")
                 {
                     return Ok(response);
@@ -140,7 +171,7 @@ namespace UnityHub.API.Controllers
                 }
                 return BadRequest(response);
             }
-            catch ( Exception ex)
+            catch (Exception ex)
             {
                 return StatusCode(500, new
                 {

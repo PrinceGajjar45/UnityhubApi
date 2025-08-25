@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using UnityHub.Infrastructure.Data;
 using UnityHub.Infrastructure.Interface;
@@ -66,7 +67,7 @@ namespace UnityHub.Infrastructure.Repository
                 var userRoles = await _userManager.GetRolesAsync(user);
                 var authClaims = new List<Claim>
                 {
-                    new Claim(ClaimTypes.Name, user.UserName),
+                    new Claim(ClaimTypes.Name, user.Email),
                     new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 };
 
@@ -149,22 +150,40 @@ namespace UnityHub.Infrastructure.Repository
                 var user = new ApplicationUser
                 {
                     UserName = model.Username,
+                    FirstName = model.FirstName,
+                    LastName = model.LastName,
+                    PhoneNumber = model.PhoneNumber,
+                    IsServiceProvider = model.IsServiceProvider,
+                    Location = model.Location,
+                    ProfileUrl = model.ProfileUrl,
                     Email = model.Email,
                     EmailConfirmed = false
                 };
+                try
+                {
+                    var result = await _userManager.CreateAsync(user, model.Password);
 
-                var result = await _userManager.CreateAsync(user, model.Password);
-                if (!result.Succeeded)
+                    if (!result.Succeeded)
+                    {
+                        return new Response
+                        {
+                            Status = "Error",
+                            Message = string.Join(", ", result.Errors.Select(x => "Code " + x.Code + " Description" + x.Description))
+                        };
+                    }
+                }
+                catch (Exception ex)
                 {
                     return new Response
                     {
                         Status = "Error",
-                        Message = string.Join(", ", result.Errors.Select(e => e.Description))
+                        Message = $"Failed to Create User: {ex.Message}"
                     };
+
                 }
 
                 // Generate 2FA code
-                var twoFactorCode = new Random().Next(100000, 999999).ToString();
+                var twoFactorCode = GenerateSecureRandomCode();
                 user.TwoFactorCode = twoFactorCode;
                 user.TwoFactorCodeExpiration = DateTime.UtcNow.AddMinutes(10);
                 await _userManager.UpdateAsync(user);
@@ -186,7 +205,7 @@ namespace UnityHub.Infrastructure.Repository
 
                 try
                 {
-                    _emailSender.SendEmail(senderEmail, user.Email, subject, emailMessage);
+                    _emailSender.SendEmailAsync(senderEmail, user.Email, subject, emailMessage);
                 }
                 catch (Exception ex)
                 {
@@ -209,6 +228,76 @@ namespace UnityHub.Infrastructure.Repository
                 {
                     Status = "Error",
                     Message = $"An error occurred during registration: {ex.Message}"
+                };
+            }
+        }
+
+        public async Task<Response> ReSentVerificationCode(ReSentVerificationCode reSentVerification)
+        {
+            if (reSentVerification == null)
+            {
+                return new Response
+                {
+                    Status = "Error",
+                    Message = "Request cannot be null."
+                };
+            }
+
+            var user = await _userManager.FindByEmailAsync(reSentVerification.Email);
+            if (user == null)
+            {
+                return new Response
+                {
+                    Status = "Success",
+                    Message = "If the email exists, a verification code has been sent."
+                };
+            }
+
+            var twoFactorCode = GenerateSecureRandomCode();
+            user.TwoFactorCode = twoFactorCode;
+            user.TwoFactorCodeExpiration = DateTime.UtcNow.AddMinutes(10);
+
+            var updateResult = await _userManager.UpdateAsync(user);
+            if (!updateResult.Succeeded)
+            {
+                return new Response
+                {
+                    Status = "Error",
+                    Message = "Failed to update user verification code."
+                };
+            }
+
+            var subject = "Your UnityHub Verification Code";
+            var emailMessage = $"Your verification code is: <b>{twoFactorCode}</b>. It will expire in 10 minutes.";
+            var senderEmail = _configuration["AppSettings:SenderEmail"];
+
+            if (string.IsNullOrEmpty(senderEmail))
+            {
+                return new Response
+                {
+                    Status = "Error",
+                    Message = "Sender email is not configured."
+                };
+            }
+
+            try
+            {
+                _emailSender.SendEmailAsync(senderEmail, user.Email, subject, emailMessage);
+
+                return new Response
+                {
+                    Status = "Success", // Changed from "Error" to "Success"
+                    Message = "Verification code sent successfully."
+                };
+            }
+            catch (Exception)
+            {
+                // Log the exception for debugging purposes
+
+                return new Response
+                {
+                    Status = "Error",
+                    Message = "Failed to send verification email. Please try again later."
                 };
             }
         }
@@ -264,6 +353,7 @@ namespace UnityHub.Infrastructure.Repository
                 }
 
                 user.EmailConfirmed = true;
+                user.TwoFactorEnabled = true;
                 user.TwoFactorCode = null;
                 user.TwoFactorCodeExpiration = null;
 
@@ -344,7 +434,7 @@ namespace UnityHub.Infrastructure.Repository
 
                 try
                 {
-                    _emailSender.SendEmail(senderEmail, user.Email, subject, emailMessage);
+                    _emailSender.SendEmailAsync(senderEmail, user.Email, subject, emailMessage);
 
                     return new Response
                     {
@@ -352,7 +442,7 @@ namespace UnityHub.Infrastructure.Repository
                         Message = "Password reset email sent successfully"
                     };
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     return new Response
                     {
@@ -361,7 +451,7 @@ namespace UnityHub.Infrastructure.Repository
                     };
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return new Response
                 {
@@ -442,7 +532,7 @@ namespace UnityHub.Infrastructure.Repository
                     Message = "Password reset successfully"
                 };
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return new Response
                 {
@@ -499,7 +589,7 @@ namespace UnityHub.Infrastructure.Repository
                         Message = "User not found"
                     };
                 }
-                
+
                 if (changeUserPassword.NewPassword != changeUserPassword.ConfirmNewPassword)
                 {
                     return new Response
@@ -533,6 +623,17 @@ namespace UnityHub.Infrastructure.Repository
                     Message = $"An error occurred while changing password: {ex.Message}"
                 };
             }
+        }
+
+        private string GenerateSecureRandomCode()
+        {
+            using var rng = RandomNumberGenerator.Create();
+            var tokenBuffer = new byte[4];
+            rng.GetBytes(tokenBuffer);
+
+            // Convert to a 6-digit number
+            var numericToken = Math.Abs(BitConverter.ToInt32(tokenBuffer, 0)) % 1000000;
+            return numericToken.ToString("D6");
         }
     }
 }

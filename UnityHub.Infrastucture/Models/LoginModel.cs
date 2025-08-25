@@ -1,13 +1,11 @@
-﻿using System.ComponentModel.DataAnnotations;
-
-namespace UnityHub.Infrastructure.Models
+﻿namespace UnityHub.Infrastructure.Models
 
 {
     public class LoginModel
     {
-  
+
         public string Email { get; set; }
-    
+
         public string Password { get; set; }
     }
 }

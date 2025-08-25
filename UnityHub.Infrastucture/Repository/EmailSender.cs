@@ -2,7 +2,7 @@ using Microsoft.Extensions.Configuration;
 using System.Net;
 using System.Net.Mail;
 using UnityHub.Infrastructure.Interface;
- 
+
 
 namespace UnityHub.Infrastructure.Services
 {
@@ -14,7 +14,7 @@ namespace UnityHub.Infrastructure.Services
             _configuration = configuration;
         }
 
-        public void SendEmail(string from, string to, string subject, string body)
+        public void SendEmailAsync(string from, string to, string subject, string body)
         {
             try
             {

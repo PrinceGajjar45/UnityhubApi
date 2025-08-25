@@ -2,10 +2,9 @@
 
 namespace UnityHub.Infrastructure.Models
 {
-    public class ForgotPassword
+    public class ReSentVerificationCode
     {
         [Required]
-        [EmailAddress]
         public string Email { get; set; }
     }
 }
