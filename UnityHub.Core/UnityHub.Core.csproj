@@ -10,9 +10,6 @@
     <PackageReference Include="AutoMapper" Version="15.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Core" Version="2.3.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.3" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\UnityHub.Infrastucture\UnityHub.Infrastructure.csproj" />
   </ItemGroup>
 

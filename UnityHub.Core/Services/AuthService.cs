@@ -1,7 +1,15 @@
-﻿using UnityHub.Core.Interface;
+using UnityHub.Core.CommonModel;
+using UnityHub.Core.Interface;
 using UnityHub.Core.Models;
-using UnityHub.Core.ServiceModel;
 using UnityHub.Infrastructure.Interface;
+using InfrastructureChangeUserPassword = UnityHub.Infrastructure.CommonModel.ChangeUserPassword;
+using InfrastructureForgotPassword = UnityHub.Infrastructure.CommonModel.ForgotPassword;
+using InfrastructureLoginModel = UnityHub.Infrastructure.CommonModel.LoginModel;
+using InfrastructureRegisterModel = UnityHub.Infrastructure.CommonModel.RegisterModel;
+using InfrastructureReSentVerificationCode = UnityHub.Infrastructure.CommonModel.ReSentVerificationCode;
+using InfrastructureResetPassword = UnityHub.Infrastructure.CommonModel.ResetPassword;
+using InfrastructureResponse = UnityHub.Infrastructure.CommonModel.Response;
+using InfrastructureUpdateUserProfile = UnityHub.Infrastructure.CommonModel.UpdateUserProfile;
 
 namespace UnityHub.Core.Services
 {
@@ -11,212 +19,120 @@ namespace UnityHub.Core.Services
 
         public AuthService(IAuthRepository authRepository)
         {
-            _authRepository = authRepository;
+            _authRepository = authRepository ?? throw new ArgumentNullException(nameof(authRepository));
         }
 
-        public async Task<Response> LoginAsync(LoginModel model)
+
+        public async Task<CustomApiResponse<UserBasicDetails>> LoginAsync(LoginModel model)
         {
-            try
-            {
-                var loginModel = new UnityHub.Infrastructure.Models.LoginModel
-                {
-                    Email = model.Email,
-                    Password = model.Password
-                };
-                var loginResponse = await _authRepository.Login(loginModel);
-                var response = new Response
-                {
-                    Status = loginResponse.Status,
-                    Message = loginResponse.Message,
-                    Token = loginResponse.Token,
-                    Expiration = loginResponse.Expiration
-                };
-                return response;
-            }
-            catch (Exception ex)
-            {
-                return new Response
-                {
-                    Status = "Error",
-                    Message = $"An error occurred during Login: {ex.Message}"
-                };
-            }
+            var infraModel = ConvertData<LoginModel, InfrastructureLoginModel>(model);
+            var response = await _authRepository.Login(infraModel);
+            var user = MapToUserBasicDetails(response);
+            return ConvertResponse(response, user);
         }
 
-        public async Task<Response> RegisterAsync(RegisterModel model)
+        public async Task<CustomApiResponse<UserBasicDetails>> RegisterAsync(RegisterModel model)
         {
-            try
-            {
-                var registerModel = new UnityHub.Infrastructure.Models.RegisterModel
-                {
-                    Username = model.Username,
-                    FirstName = model.FirstName,
-                    LastName = model.LastName,
-                    PhoneNumber = model.PhoneNumber,
-                    IsServiceProvider = model.IsServiceProvider,
-                    Location = model.Location,
-                    ProfileUrl = model.ProfileUrl,
-                    Email = model.Email,
-                    Password = model.Password,
-                    ConfirmPassword = model.ConfirmPassword
-
-                };
-                var response = await _authRepository.Register(registerModel);
-                var data = new Response
-                {
-                    Status = response.Status,
-                    Message = response.Message,
-                    Token = response.Token,
-                    Expiration = response.Expiration
-                };
-                return data;
-            }
-            catch (Exception ex)
-            {
-                return new Response
-                {
-                    Status = "Error",
-                    Message = $"An error occurred during registration: {ex.Message}"
-                };
-            }
+            var infraModel = ConvertData<RegisterModel, InfrastructureRegisterModel>(model);
+            var response = await _authRepository.Register(infraModel);
+            var user = MapToUserBasicDetails(response);
+            return ConvertResponse(response, user);
         }
 
-        public async Task<Response> ReSentVerificationCode(ReSentVerificationCode reSentVerification)
+        public async Task<CustomApiResponse<object>> VerifyTwoFactorCodeAsync(string email, string code)
         {
-            try
-            {
-                var requestModel = new UnityHub.Infrastructure.Models.ReSentVerificationCode
-                {
-                    Email = reSentVerification.Email
-                };
-                var response = await _authRepository.ReSentVerificationCode(requestModel);
-                var data = new Response
-                {
-                    Status = response.Status,
-                    Message = response.Message,
-                    Token = response.Token,
-                    Expiration = response.Expiration
-                };
-                return data;
-            }
-            catch (Exception ex)
-            {
-                return new Response
-                {
-                    Status = "Error",
-                    Message = $"An error occurred during resent code: {ex.Message}"
-                };
-            }
+            var response = await _authRepository.VerifyTwoFactorCodeAsync(email, code);
+            return ConvertResponse<object>(response);
         }
 
-        public async Task<Response> VerifyTwoFactorCodeAsync(string email, string code)
+        public async Task<CustomApiResponse<object>> ForgotPassword(ForgotPassword email)
         {
-            try
-            {
-                var verifyTwoFactorCode = await _authRepository.VerifyTwoFactorCodeAsync(email, code);
-                var response = new Response
-                {
-                    Status = verifyTwoFactorCode.Status,
-                    Message = verifyTwoFactorCode.Message,
-                    Token = verifyTwoFactorCode.Token,
-                    Expiration = verifyTwoFactorCode.Expiration
-                };
-                return response;
-            }
-            catch (Exception ex)
-            {
-                return new Response
-                {
-                    Status = "Error",
-                    Message = $"An error occurred during two-factor verification: {ex.Message}"
-                };
-            }
+            var infraModel = ConvertData<ForgotPassword, InfrastructureForgotPassword>(email);
+            var response = await _authRepository.ForgotPassword(infraModel);
+            return ConvertResponse<object>(response);
         }
 
-        public async Task<Response> ForgotPassword(ForgotPassword email)
+        public async Task<CustomApiResponse<object>> ResetPassword(ResetPassword resetPassword)
         {
-            try
-            {
-                var forgotPasswordModel = new UnityHub.Infrastructure.Models.ForgotPassword
-                {
-                    Email = email.Email,
-                };
-
-                var result = await _authRepository.ForgotPassword(forgotPasswordModel);
-
-                return new Response
-                {
-                    Status = result.Status,
-                    Message = result.Message
-                };
-            }
-            catch (Exception)
-            {
-
-                return new Response
-                {
-                    Status = "Error",
-                    Message = "An error occurred while processing your request. Please try again later."
-                };
-            }
+            var infraModel = ConvertData<ResetPassword, InfrastructureResetPassword>(resetPassword);
+            var response = await _authRepository.ResetPassword(infraModel);
+            return ConvertResponse<object>(response);
         }
 
-        public async Task<Response> ResetPassword(ResetPassword resetPassword)
+        public async Task<CustomApiResponse<object>> ChangeUserPassword(ChangeUserPassword changeUserPassword)
         {
-            try
-            {
-                var resetPasswordModel = new UnityHub.Infrastructure.Models.ResetPassword
-                {
-                    Password = resetPassword.Password,
-                    ConfirmPassword = resetPassword.ConfirmPassword,
-                    Token = resetPassword.Token,
-                    Email = resetPassword.Email
-                };
-
-                var response = await _authRepository.ResetPassword(resetPasswordModel);
-                return new Response
-                {
-                    Status = response.Status,
-                    Message = response.Message
-                };
-            }
-            catch (Exception)
-            {
-                return new Response
-                {
-                    Status = "Error",
-                    Message = "An error occurred while processing your request. Please try again later."
-                };
-            }
+            var infraModel = ConvertData<ChangeUserPassword, InfrastructureChangeUserPassword>(changeUserPassword);
+            var response = await _authRepository.ChangeUserPassword(infraModel);
+            return ConvertResponse<object>(response);
         }
 
-        public async Task<Response> ChangeUserPassword(ChangeUserPassword changeUserPassword)
+        public async Task<CustomApiResponse<object>> ReSentVerificationCode(ReSentVerificationCode reSentVerification)
         {
-            try
-            {
-                var changePasswordModel = new UnityHub.Infrastructure.Models.ChangeUserPassword
-                {
-                    OldPassword = changeUserPassword.OldPassword,
-                    NewPassword = changeUserPassword.NewPassword,
-                    ConfirmNewPassword = changeUserPassword.ConfirmNewPassword,
-                    Email = changeUserPassword.Email
-                };
-                var response = await _authRepository.ChangeUserPassword(changePasswordModel);
-                return new Response
-                {
-                    Status = response.Status,
-                    Message = response.Message
-                };
-            }
-            catch (Exception ex)
-            {
-                return new Response
-                {
-                    Status = "Error",
-                    Message = $"An error occurred while changing the password: {ex.Message}"
-                };
-            }
+            var infraModel = ConvertData<ReSentVerificationCode, InfrastructureReSentVerificationCode>(reSentVerification);
+            var response = await _authRepository.ReSentVerificationCode(infraModel);
+            return ConvertResponse<object>(response);
         }
 
+        public async Task<CustomApiResponse<object>> UpdateUserProfile(UpdateUserProfile updateUserProfile)
+        {
+            var infraModel = ConvertData<UpdateUserProfile, InfrastructureUpdateUserProfile>(updateUserProfile);
+            var response = await _authRepository.UpdateUserProfile(infraModel);
+            return ConvertResponse<object>(response);
+        }
+
+        public async Task<CustomApiResponse<UserBasicDetails>> GetUserProfileAsync(string email)
+        {
+            var response = await _authRepository.GetUserProfileAsync(email);
+            var user = MapToUserBasicDetails(response);
+            return ConvertResponse(response, user);
+        }
+
+
+        // Generic data converter method for mapping between types
+        private TOut ConvertData<TIn, TOut>(TIn input)
+            where TOut : new()
+        {
+            var output = new TOut();
+            foreach (var propIn in typeof(TIn).GetProperties())
+            {
+                var propOut = typeof(TOut).GetProperty(propIn.Name);
+                if (propOut != null && propOut.CanWrite)
+                {
+                    propOut.SetValue(output, propIn.GetValue(input));
+                }
+            }
+            return output;
+        }
+
+        // Helper to convert Infrastructure.Response to Core.CustomApiResponse<T>
+        private CustomApiResponse<T> ConvertResponse<T>(InfrastructureResponse response, T data = default)
+        {
+            return new CustomApiResponse<T>
+            {
+                StatusCode = response.Status == "Success" ? 200 : 400,
+                Message = response.Message,
+                Data = data,
+                Token = response.Token,
+                Expiration = response.Expiration
+            };
+        }
+
+        // Helper to map Infrastructure.Response to UserBasicDetails
+        private UserBasicDetails MapToUserBasicDetails(InfrastructureResponse response)
+        {
+            return new UserBasicDetails
+            {
+                UserId = response.UserId,
+                Username = response.Username,
+                FirstName = response.FirstName,
+                LastName = response.LastName,
+                Email = response.Email,
+                PhoneNumber = response.PhoneNumber,
+                Location = response.Location,
+                ProfileUrl = response.ProfileUrl,
+                IsServiceProvider = response.IsServiceProvider ?? false,
+                Role = response.Roles != null && response.Roles.Count > 0 ? response.Roles[0] : null
+            };
+        }
     }
 }

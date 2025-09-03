@@ -1,8 +1,6 @@
-﻿using Microsoft.AspNetCore.Identity;
-
-namespace UnityHub.Infrastructure.Data
+namespace UnityHub.Infrastructure.CommonModel
 {
-    public class UserRoles : IdentityRole
+    public static class UserRoles
     {
         public const string Admin = "Admin";
         public const string User = "User";

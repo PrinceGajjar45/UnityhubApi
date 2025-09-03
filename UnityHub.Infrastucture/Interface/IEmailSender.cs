@@ -1,7 +1,7 @@
 namespace UnityHub.Infrastructure.Interface
 {
-    public interface IEmailSender
+    public interface IEmailSender<TUser>
     {
-        void SendEmailAsync(string from, string to, string subject, string body);
+        Task SendEmailAsync(string from, string to, string subject, string body);
     }
 }

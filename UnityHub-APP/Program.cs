@@ -3,22 +3,25 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
-using UnityHub.Core.Interface;
-using UnityHub.Core.Services;
+using UnityHub.API.Mappings;
 using UnityHub.Infrastructure.Data;
-using UnityHub.Infrastructure.Interface;
-using UnityHub.Infrastructure.Repository;
-using UnityHub.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
 
+
 // For Entity Framework
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("ConnectionString")));
-
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("ConnectionString"),
+        sqlServerOptions => sqlServerOptions.EnableRetryOnFailure(
+            maxRetryCount: 5,
+            maxRetryDelay: TimeSpan.FromSeconds(30),
+            errorNumbersToAdd: null
+        )
+    ));
 // For Identity
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
@@ -28,9 +31,18 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 
-builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<IAuthRepository, AuthRepository>();
-builder.Services.AddTransient<IEmailSender, EmailSender>();
+// Update DI registrations: register Core service interface to Infrastructure implementation
+builder.Services.AddScoped<UnityHub.Core.Interface.IAuthService, UnityHub.Core.Services.AuthService>();
+builder.Services.AddScoped<UnityHub.Infrastructure.Interface.IAuthRepository, UnityHub.Infrastructure.Repository.AuthRepository>();
+builder.Services.AddScoped<UnityHub.Infrastructure.Repository.AuthRepository>();
+builder.Services.AddTransient<UnityHub.Infrastructure.Interface.IEmailSender<UnityHub.Infrastructure.Data.ApplicationUser>, UnityHub.Infrastructure.Repository.EmailSender>();
+builder.Services.AddAutoMapper(cfg =>
+{
+    cfg.AddProfile<AuthMappingProfile>();
+});
+
+builder.Services.Configure<DataProtectionTokenProviderOptions>(options =>
+    options.TokenLifespan = TimeSpan.FromHours(2));
 
 // Adding Authentication
 builder.Services.AddAuthentication()
@@ -48,6 +60,13 @@ builder.Services.AddAuthentication()
                 Encoding.UTF8.GetBytes(builder.Configuration["JWT:Secret"]))
         };
     });
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
+    options.AddPolicy("UserOnly", policy => policy.RequireRole("User"));
+    options.AddPolicy("ServiceProviderOnly", policy => policy.RequireRole("ServiceProvider"));
+});
 
 builder.Services.AddEndpointsApiExplorer();
 
@@ -92,6 +111,12 @@ builder.Services.AddSwaggerGen(options =>
             new string[] {}
         }
     });
+
+
+    // Enable XML comments for Swagger
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    options.IncludeXmlComments(xmlPath);
 });
 
 var app = builder.Build();
@@ -115,6 +140,12 @@ if (app.Environment.IsDevelopment())
         options.DisplayRequestDuration();
         options.EnableDeepLinking();
     });
+}
+
+using (var scope = app.Services.CreateScope())
+{
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    await UnityHub.Infrastructure.Data.RoleSeeder.SeedRolesAsync(roleManager);
 }
 
 app.UseHttpsRedirection();
