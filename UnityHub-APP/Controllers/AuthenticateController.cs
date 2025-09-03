@@ -49,7 +49,7 @@ namespace UnityHub.API.Controllers
                             var value = sourceProp.GetValue(source);
                             targetProp.SetValue(target, value);
                         }
-                        catch (Exception ex)
+                        catch (Exception)
                         {
 
                         }
@@ -63,22 +63,6 @@ namespace UnityHub.API.Controllers
                 throw new InvalidOperationException($"Conversion from {typeof(TSource).Name} to {typeof(TTarget).Name} failed", ex);
             }
         }
-
-
-        // Generic data converter for mapping between types
-        //private TOut ConvertData<TIn, TOut>(TIn input) where TOut : new()
-        //{
-        //    var output = new TOut();
-        //    foreach (var propIn in typeof(TIn).GetProperties())
-        //    {
-        //        var propOut = typeof(TOut).GetProperty(propIn.Name);
-        //        if (propOut != null && propOut.CanWrite)
-        //        {
-        //            propOut.SetValue(output, propIn.GetValue(input));
-        //        }
-        //    }
-        //    return output;
-        //}
 
         /// <summary>
         /// Authenticates a user and returns a JWT token if successful.
@@ -104,6 +88,7 @@ namespace UnityHub.API.Controllers
             return StatusCode(response.StatusCode, response);
         }
 
+
         /// <summary>
         /// Updates the profile of the current user.
         /// </summary>
@@ -121,6 +106,7 @@ namespace UnityHub.API.Controllers
                 return StatusCode(500, new { Status = "Error", ex.Message });
             }
         }
+
 
         /// <summary>
         /// Resends the verification code to the user's email address.
@@ -140,6 +126,7 @@ namespace UnityHub.API.Controllers
             }
         }
 
+
         /// <summary>
         /// Verifies the two-factor authentication (2FA) code for a user.
         /// </summary>
@@ -156,6 +143,7 @@ namespace UnityHub.API.Controllers
                 return StatusCode(500, new { Status = "Error", ex.Message });
             }
         }
+
 
         /// <summary>
         /// Resets the user's password using a reset token.
@@ -174,6 +162,7 @@ namespace UnityHub.API.Controllers
                 return StatusCode(500, new { Status = "Error", ex.Message });
             }
         }
+
 
         /// <summary>
         /// Initiates the forgot password process for a user.
@@ -211,6 +200,7 @@ namespace UnityHub.API.Controllers
             }
         }
 
+
         /// <summary>
         /// Gets the profile of the currently authenticated user.
         /// </summary>
@@ -230,6 +220,29 @@ namespace UnityHub.API.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new CustomApiResponse<object> { StatusCode = 500, Message = ex.Message });
+            }
+        }
+
+
+        /// <summary>
+        /// Get All User Role For Select Specific Role To Register New Account 
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet("Get-User-Role")]
+        public async Task<IActionResult> GetGetUserRoleAsync()
+        {
+            try
+            {
+                var response = await _authService.GetAllRoleNamesAsync();
+                return StatusCode(response.StatusCode, response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new CustomApiResponse<object>
+                {
+                    StatusCode = 500,
+                    Message = $"Internal server error: {ex.Message}"
+                });
             }
         }
     }

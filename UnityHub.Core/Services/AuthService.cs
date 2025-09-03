@@ -87,6 +87,12 @@ namespace UnityHub.Core.Services
             return ConvertResponse(response, user);
         }
 
+        // Better approach: Create a specific response type
+        public async Task<CustomApiResponse<List<string>>> GetAllRoleNamesAsync()
+        {
+            var response = await _authRepository.GetAllRoleNamesAsync();
+            return ConvertResponse(response, response.Roles ?? new List<string>());
+        }
 
         // Generic data converter method for mapping between types
         private TOut ConvertData<TIn, TOut>(TIn input)
@@ -107,14 +113,25 @@ namespace UnityHub.Core.Services
         // Helper to convert Infrastructure.Response to Core.CustomApiResponse<T>
         private CustomApiResponse<T> ConvertResponse<T>(InfrastructureResponse response, T data = default)
         {
-            return new CustomApiResponse<T>
+            var apiResponse = new CustomApiResponse<T>
             {
                 StatusCode = response.Status == "Success" ? 200 : 400,
                 Message = response.Message,
-                Data = data,
                 Token = response.Token,
                 Expiration = response.Expiration
             };
+
+            // Handle role data specifically
+            if (response.Roles != null && typeof(T) == typeof(List<string>))
+            {
+                apiResponse.Data = (T)(object)response.Roles;
+            }
+            else
+            {
+                apiResponse.Data = data;
+            }
+
+            return apiResponse;
         }
 
         // Helper to map Infrastructure.Response to UserBasicDetails
@@ -134,5 +151,6 @@ namespace UnityHub.Core.Services
                 Role = response.Roles != null && response.Roles.Count > 0 ? response.Roles[0] : null
             };
         }
+
     }
 }

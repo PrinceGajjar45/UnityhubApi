@@ -54,7 +54,7 @@ namespace UnityHub.Infrastructure.Repository
                 new Claim("UserId", user.Id),
                 new Claim("FirstName", user.FirstName ?? string.Empty),
                 new Claim("LastName", user.LastName ?? string.Empty),
-                new Claim("UserRole", user.UserRole.ToString())
+                new Claim("UserRole", userRoles.ToString())
             };
             foreach (var role in userRoles)
                 authClaims.Add(new Claim(ClaimTypes.Role, role));
@@ -171,7 +171,6 @@ namespace UnityHub.Infrastructure.Repository
                     if (!updateResult.Succeeded)
                     {
                         // Log this error but continue since it's not critical
-                        // You might want to add logging here
                     }
 
                     // Send verification email (fire and forget)
@@ -203,7 +202,6 @@ namespace UnityHub.Infrastructure.Repository
                 new Claim("UserId", user.Id),
                 new Claim("FirstName", user.FirstName ?? string.Empty),
                 new Claim("LastName", user.LastName ?? string.Empty),
-                new Claim("IsServiceProvider", user.IsServiceProvider.ToString()),
                 new Claim(ClaimTypes.Role, userRole)
             };
 
@@ -241,9 +239,6 @@ namespace UnityHub.Infrastructure.Repository
             }
             catch (Exception)
             {
-                // Log the exception here
-                // _logger.LogError(ex, "Registration failed for email: {Email}", model?.Email);
-
                 return Response.Error("An unexpected error occurred during registration. Please try again.");
             }
         }
@@ -371,6 +366,37 @@ namespace UnityHub.Infrastructure.Repository
             if (user == null)
                 return Response.NotFound("User");
             return Response.Success("Profile fetched").WithUserData(user);
+        }
+
+        public async Task<Response> GetAllRoleNamesAsync()
+        {
+            try
+            {
+                var userRoles = await _roleManager.Roles.ToListAsync();
+
+                if (userRoles == null || !userRoles.Any())
+                {
+                    return Response.Error("No roles found");
+                }
+
+                // Extract role names and filter out null/empty names
+                var roleNames = userRoles.Select(r => r.Name)
+                                        .Where(name => !string.IsNullOrEmpty(name))
+                                        .ToList();
+
+                if (!roleNames.Any())
+                {
+                    return Response.Error("No valid role names found");
+                }
+
+                // Return with roles in the Data property
+                return Response.Success("Roles retrieved successfully")
+                             .WithRoles(roleNames);
+            }
+            catch (Exception ex)
+            {
+                return Response.Error($"Error while getting all roles: {ex.Message}");
+            }
         }
 
         private void UpdateAddressProperties(ApplicationUser user, object updateUserProfile)

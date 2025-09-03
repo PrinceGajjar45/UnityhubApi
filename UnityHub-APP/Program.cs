@@ -51,7 +51,7 @@ builder.Services.AddAuthentication()
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidateAudience = true,
+            ValidateAudience = false,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
             ValidIssuer = builder.Configuration["JWT:ValidIssuer"],
@@ -142,11 +142,11 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-using (var scope = app.Services.CreateScope())
-{
-    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-    await UnityHub.Infrastructure.Data.RoleSeeder.SeedRolesAsync(roleManager);
-}
+//using (var scope = app.Services.CreateScope())
+//{
+//    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+//    await UnityHub.Infrastructure.Data.RoleSeeder.SeedRolesAsync(roleManager);
+//}
 
 app.UseHttpsRedirection();
 

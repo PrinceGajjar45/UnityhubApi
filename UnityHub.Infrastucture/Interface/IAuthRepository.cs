@@ -13,5 +13,6 @@ namespace UnityHub.Infrastructure.Interface
         Task<Response> UpdateUserProfile(UpdateUserProfile updateUserProfile);
         Task<Response> VerifyTwoFactorCodeAsync(string email, string code);
         Task<Response> GetUserProfileAsync(string email);
+        Task<Response> GetAllRoleNamesAsync();
     }
 }

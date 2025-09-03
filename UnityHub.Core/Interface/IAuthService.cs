@@ -2,6 +2,7 @@
 using UnityHub.Core.Models;
 
 
+
 namespace UnityHub.Core.Interface
 {
     public interface IAuthService
@@ -14,6 +15,8 @@ namespace UnityHub.Core.Interface
         Task<CustomApiResponse<object>> ChangeUserPassword(ChangeUserPassword changeUserPassword);
         Task<CustomApiResponse<object>> ReSentVerificationCode(ReSentVerificationCode reSentVerification);
         Task<CustomApiResponse<object>> UpdateUserProfile(UpdateUserProfile updateUserProfile);
-        Task<CustomApiResponse<UserBasicDetails>> GetUserProfileAsync(string email); // Get user profile by UserId
+        Task<CustomApiResponse<UserBasicDetails>> GetUserProfileAsync(string email);
+        Task<CustomApiResponse<List<string>>> GetAllRoleNamesAsync();
+
     }
 }
