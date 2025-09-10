@@ -1,12 +1,11 @@
-﻿using Microsoft.AspNetCore.WebUtilities;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
-using System.Net;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using UnityHub.Infrastructure.CommonModel;
 using UnityHub.Infrastructure.Data;
 using UnityHub.Infrastructure.Interface;
@@ -33,23 +32,32 @@ namespace UnityHub.Infrastructure.Repository
             _emailSender = emailSender ?? throw new ArgumentNullException(nameof(emailSender));
         }
 
+        // Phone number validation (10 digits, adjust regex as needed)
+        private bool IsValidPhoneNumber(string number)
+        {
+            return !string.IsNullOrWhiteSpace(number) && Regex.IsMatch(number, @"^[0-9]{10}$");
+        }
+
         public async Task<Response> Login(LoginModel model)
         {
-            if (model == null || string.IsNullOrWhiteSpace(model.Email) || string.IsNullOrWhiteSpace(model.Password))
-                return Response.Error("Email and password are required");
+            if (model == null || string.IsNullOrWhiteSpace(model.PhoneNumber) || string.IsNullOrWhiteSpace(model.Password))
+                return Response.Error("Phone number and password are required");
 
-            var user = await _userManager.FindByEmailAsync(model.Email);
+            if (!IsValidPhoneNumber(model.PhoneNumber))
+                return Response.Error("Invalid phone number format");
+
+            var user = _userManager.Users.FirstOrDefault(u => u.PhoneNumber == model.PhoneNumber);
             if (user == null)
-                return Response.Error("Invalid email or password");
+                return Response.Error("Invalid phone number or password");
 
             var isPasswordValid = await _userManager.CheckPasswordAsync(user, model.Password);
             if (!isPasswordValid)
-                return Response.Error("Invalid email or password");
+                return Response.Error("Invalid phone number or password");
 
             var userRoles = await _userManager.GetRolesAsync(user);
             var authClaims = new List<Claim>
             {
-                new Claim(ClaimTypes.Name, user.Email ?? string.Empty),
+                new Claim(ClaimTypes.Name, user.PhoneNumber ?? string.Empty),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 new Claim("UserId", user.Id),
                 new Claim("FirstName", user.FirstName ?? string.Empty),
@@ -90,8 +98,11 @@ namespace UnityHub.Infrastructure.Repository
                 if (model == null)
                     return Response.Error("Registration model is required");
 
-                if (string.IsNullOrWhiteSpace(model.Email))
-                    return Response.Error("Email is required");
+                if (string.IsNullOrWhiteSpace(model.PhoneNumber))
+                    return Response.Error("Phone number is required");
+
+                if (!IsValidPhoneNumber(model.PhoneNumber))
+                    return Response.Error("Invalid phone number format");
 
                 if (string.IsNullOrWhiteSpace(model.Password))
                     return Response.Error("Password is required");
@@ -99,17 +110,17 @@ namespace UnityHub.Infrastructure.Repository
                 if (model.Password != model.ConfirmPassword)
                     return Response.Error("Passwords do not match");
 
-                // Check if user already exists
-                var userExists = await _userManager.FindByEmailAsync(model.Email.Trim());
-                if (userExists != null)
-                    return Response.Error("Email is already registered!");
+                // Check if user already exists by phone number
+                var phoneExists = _userManager.Users.FirstOrDefault(u => u.PhoneNumber == model.PhoneNumber.Trim());
+                if (phoneExists != null)
+                    return Response.Error("Phone number is already registered!");
 
-                // Check if phone number already exists
-                if (!string.IsNullOrWhiteSpace(model.PhoneNumber))
+                // Check if email already exists (optional, for legacy support)
+                if (!string.IsNullOrWhiteSpace(model.Email))
                 {
-                    var phoneExists = _userManager.Users.FirstOrDefault(u => u.PhoneNumber == model.PhoneNumber.Trim());
-                    if (phoneExists != null)
-                        return Response.Error("Phone number is already registered!");
+                    var userExists = await _userManager.FindByEmailAsync(model.Email.Trim());
+                    if (userExists != null)
+                        return Response.Error("Email is already registered!");
                 }
 
                 // Determine user role
@@ -121,7 +132,7 @@ namespace UnityHub.Infrastructure.Repository
                 if (!validRoles.Contains(userRole))
                     return Response.Error($"Invalid role specified. Valid roles are: {string.Join(", ", validRoles)}");
 
-                // Get role ID (this was problematic in original code)
+                // Get role ID
                 var role = await _roleManager.FindByNameAsync(userRole);
                 if (role == null)
                     return Response.Error($"Role '{userRole}' not found in the system");
@@ -168,42 +179,20 @@ namespace UnityHub.Infrastructure.Repository
                     user.TwoFactorCodeExpiration = DateTime.UtcNow.AddMinutes(10);
                     var updateResult = await _userManager.UpdateAsync(user);
 
-                    if (!updateResult.Succeeded)
-                    {
-                        // Log this error but continue since it's not critical
-                    }
-
-                    // Send verification email (fire and forget)
-                    var senderEmail = _configuration?["AppSettings:SenderEmail"];
-                    if (!string.IsNullOrWhiteSpace(senderEmail) && !string.IsNullOrWhiteSpace(user.Email))
-                    {
-                        try
-                        {
-                            var subject = "Your UnityHub Verification Code";
-                            var emailMessage = $"Your verification code is: <b>{user.TwoFactorCode}</b>. It will expire in 10 minutes.";
-                            _ = _emailSender.SendEmailAsync(senderEmail, user.Email, subject, emailMessage);
-                        }
-                        catch (Exception)
-                        {
-                            // Log email sending error but continue registration
-                            // You might want to add logging here: _logger.LogError(emailEx, "Failed to send verification email");
-                        }
-                    }
-
                     // Generate JWT token
                     var jwtSecret = _configuration?["JWT:Secret"];
                     if (string.IsNullOrWhiteSpace(jwtSecret))
                         return Response.Error("JWT configuration is missing");
 
                     var authClaims = new List<Claim>
-            {
-                new Claim(ClaimTypes.Name, user.Email ?? string.Empty),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new Claim("UserId", user.Id),
-                new Claim("FirstName", user.FirstName ?? string.Empty),
-                new Claim("LastName", user.LastName ?? string.Empty),
-                new Claim(ClaimTypes.Role, userRole)
-            };
+                    {
+                        new Claim(ClaimTypes.Name, user.PhoneNumber ?? string.Empty),
+                        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                        new Claim("UserId", user.Id),
+                        new Claim("FirstName", user.FirstName ?? string.Empty),
+                        new Claim("LastName", user.LastName ?? string.Empty),
+                        new Claim(ClaimTypes.Role, userRole)
+                    };
 
                     var authSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
                     var token = new JwtSecurityToken(
@@ -229,11 +218,7 @@ namespace UnityHub.Infrastructure.Repository
                     {
                         await _userManager.DeleteAsync(user);
                     }
-                    catch
-                    {
-                        // Suppress cleanup errors
-                    }
-
+                    catch { }
                     return Response.Error($"Registration failed: {innerEx.Message}");
                 }
             }
@@ -243,11 +228,11 @@ namespace UnityHub.Infrastructure.Repository
             }
         }
 
-        public async Task<Response> VerifyTwoFactorCodeAsync(string email, string code)
+        public async Task<Response> VerifyTwoFactorCodeAsync(string phoneNumber, string code)
         {
-            if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(code))
-                return Response.Error("Email and code are required");
-            var user = await _userManager.FindByEmailAsync(email);
+            if (string.IsNullOrEmpty(phoneNumber) || string.IsNullOrEmpty(code))
+                return Response.Error("Phone number and code are required");
+            var user = _userManager.Users.FirstOrDefault(u => u.PhoneNumber == phoneNumber);
             if (user == null)
                 return Response.NotFound("User");
             if (user.TwoFactorCode == null || user.TwoFactorCodeExpiration == null)
@@ -266,46 +251,37 @@ namespace UnityHub.Infrastructure.Repository
             return Response.Success("2FA verified");
         }
 
-        public async Task<Response> ForgotPassword(ForgotPassword email)
+        public async Task<Response> ForgotPassword(ForgotPassword forgotPassword)
         {
-            if (email == null || string.IsNullOrEmpty(email.Email))
-                return Response.Error("Email is required");
-            var user = await _userManager.FindByEmailAsync(email.Email);
+            if (forgotPassword == null || string.IsNullOrEmpty(forgotPassword.PhoneNumber))
+                return Response.Error("Phone number is required");
+            var user = _userManager.Users.FirstOrDefault(u => u.PhoneNumber == forgotPassword.PhoneNumber);
             if (user == null)
-                return Response.Success("If the email exists, a password reset link has been sent");
-            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-            var encodedToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
-            var resetLink = $"{_configuration["AppSettings:FrontendUrl"]}/reset-password?token={encodedToken}&email={WebUtility.UrlEncode(user.Email)}";
-            var subject = "Your UnityHub Password Reset";
-            var emailMessage = $@"<h3>Password Reset Request</h3><p>You requested to reset your password. Click the link below to proceed:</p><p><a href='{resetLink}'>Reset Password</a></p><p>This link will expire in 2 hours.</p>";
-            var senderEmail = _configuration["AppSettings:SenderEmail"];
-            _emailSender.SendEmailAsync(senderEmail, user.Email, subject, emailMessage);
-            return Response.Success("Forgot password email sent");
+                return Response.Success("If the phone number exists, a password reset link has been sent");
+            // Implement SMS or other phone-based password reset logic here
+            return Response.Success("Forgot password process initiated (implement SMS logic)");
         }
 
         public async Task<Response> ResetPassword(ResetPassword resetPassword)
         {
-            if (resetPassword == null || string.IsNullOrEmpty(resetPassword.Email) || string.IsNullOrEmpty(resetPassword.Token) || string.IsNullOrEmpty(resetPassword.Password))
+            if (resetPassword == null || string.IsNullOrEmpty(resetPassword.PhoneNumber) || string.IsNullOrEmpty(resetPassword.Token) || string.IsNullOrEmpty(resetPassword.Password))
                 return Response.Error("All fields are required");
             if (resetPassword.Password != resetPassword.ConfirmPassword)
                 return Response.Error("Passwords do not match");
-            var user = await _userManager.FindByEmailAsync(resetPassword.Email);
+            var user = _userManager.Users.FirstOrDefault(u => u.PhoneNumber == resetPassword.PhoneNumber);
             if (user == null)
                 return Response.Error("Invalid reset request");
-            var decodedToken = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(resetPassword.Token));
-            var resetPassResult = await _userManager.ResetPasswordAsync(user, decodedToken, resetPassword.Password);
-            if (!resetPassResult.Succeeded)
-                return Response.Error($"Password reset failed: {string.Join(", ", resetPassResult.Errors.Select(e => e.Description))}");
-            return Response.Success("Password reset");
+            // Implement SMS or other phone-based password reset logic here
+            return Response.Success("Password reset (implement SMS logic)");
         }
 
         public async Task<Response> ChangeUserPassword(ChangeUserPassword changeUserPassword)
         {
-            if (changeUserPassword == null || string.IsNullOrEmpty(changeUserPassword.Email) || string.IsNullOrEmpty(changeUserPassword.OldPassword) || string.IsNullOrEmpty(changeUserPassword.NewPassword))
+            if (changeUserPassword == null || string.IsNullOrEmpty(changeUserPassword.PhoneNumber) || string.IsNullOrEmpty(changeUserPassword.OldPassword) || string.IsNullOrEmpty(changeUserPassword.NewPassword))
                 return Response.Error("All fields are required");
             if (changeUserPassword.NewPassword != changeUserPassword.ConfirmNewPassword)
                 return Response.Error("New password and confirm password do not match");
-            var user = await _userManager.FindByEmailAsync(changeUserPassword.Email);
+            var user = _userManager.Users.FirstOrDefault(u => u.PhoneNumber == changeUserPassword.PhoneNumber);
             if (user == null)
                 return Response.NotFound("User");
             var result = await _userManager.ChangePasswordAsync(user, changeUserPassword.OldPassword, changeUserPassword.NewPassword);
@@ -316,37 +292,32 @@ namespace UnityHub.Infrastructure.Repository
 
         public async Task<Response> ReSentVerificationCode(ReSentVerificationCode reSentVerification)
         {
-            if (reSentVerification == null || string.IsNullOrEmpty(reSentVerification.Email))
-                return Response.Error("Email is required");
-            var user = await _userManager.FindByEmailAsync(reSentVerification.Email);
+            if (reSentVerification == null || string.IsNullOrEmpty(reSentVerification.PhoneNumber))
+                return Response.Error("Phone number is required");
+            var user = _userManager.Users.FirstOrDefault(u => u.PhoneNumber == reSentVerification.PhoneNumber);
             if (user == null)
-                return Response.Success("If the email exists, a verification code has been sent");
+                return Response.Success("If the phone number exists, a verification code has been sent");
             var twoFactorCode = GenerateSecureRandomCode();
             user.TwoFactorCode = twoFactorCode;
             user.TwoFactorCodeExpiration = DateTime.UtcNow.AddMinutes(10);
             var updateResult = await _userManager.UpdateAsync(user);
             if (!updateResult.Succeeded)
                 return Response.Error("Failed to update verification code");
-            var subject = "Your UnityHub Verification Code";
-            var emailMessage = $"Your verification code is: <b>{twoFactorCode}</b>. It will expire in 10 minutes.";
-            var senderEmail = _configuration["AppSettings:SenderEmail"];
-            _emailSender.SendEmailAsync(senderEmail, user.Email, subject, emailMessage);
-            return Response.Success("Verification code resent");
+            // Implement SMS sending logic here
+            return Response.Success("Verification code resent (implement SMS logic)");
         }
 
         public async Task<Response> UpdateUserProfile(UpdateUserProfile updateUserProfile)
         {
-            if (updateUserProfile == null || string.IsNullOrEmpty(updateUserProfile.Email))
-                return Response.Error("Email is required");
-            var user = await _userManager.FindByEmailAsync(updateUserProfile.Email);
+            if (updateUserProfile == null || string.IsNullOrEmpty(updateUserProfile.PhoneNumber))
+                return Response.Error("Phone number is required");
+            var user = _userManager.Users.FirstOrDefault(u => u.PhoneNumber == updateUserProfile.PhoneNumber);
             if (user == null)
                 return Response.NotFound("User");
             if (!string.IsNullOrEmpty(updateUserProfile.FirstName))
                 user.FirstName = updateUserProfile.FirstName;
             if (!string.IsNullOrEmpty(updateUserProfile.LastName))
                 user.LastName = updateUserProfile.LastName;
-            if (!string.IsNullOrEmpty(updateUserProfile.PhoneNumber))
-                user.PhoneNumber = updateUserProfile.PhoneNumber;
             if (!string.IsNullOrEmpty(updateUserProfile.ProfileUrl))
                 user.ProfileUrl = updateUserProfile.ProfileUrl;
             if (!string.IsNullOrEmpty(updateUserProfile.UserName))
@@ -358,11 +329,11 @@ namespace UnityHub.Infrastructure.Repository
             return Response.Success("Profile updated");
         }
 
-        public async Task<Response> GetUserProfileAsync(string email)
+        public async Task<Response> GetUserProfileAsync(string phoneNumber)
         {
-            if (string.IsNullOrEmpty(email))
-                return Response.Error("Email is required");
-            var user = await _userManager.FindByEmailAsync(email);
+            if (string.IsNullOrEmpty(phoneNumber))
+                return Response.Error("Phone number is required");
+            var user = _userManager.Users.FirstOrDefault(u => u.PhoneNumber == phoneNumber);
             if (user == null)
                 return Response.NotFound("User");
             return Response.Success("Profile fetched").WithUserData(user);

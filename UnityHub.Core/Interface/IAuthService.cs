@@ -17,6 +17,6 @@ namespace UnityHub.Core.Interface
         Task<CustomApiResponse<object>> UpdateUserProfile(UpdateUserProfile updateUserProfile);
         Task<CustomApiResponse<UserBasicDetails>> GetUserProfileAsync(string email);
         Task<CustomApiResponse<List<string>>> GetAllRoleNamesAsync();
-
+        Task<CustomApiResponse<object>> ValidateAndGetLocationByPinCode(string pinCode);
     }
 }

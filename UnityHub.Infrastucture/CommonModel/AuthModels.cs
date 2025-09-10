@@ -2,7 +2,7 @@ namespace UnityHub.Infrastructure.CommonModel
 {
     public class LoginModel
     {
-        public string Email { get; set; }
+        public string PhoneNumber { get; set; }
         public string Password { get; set; }
     }
 
@@ -22,27 +22,27 @@ namespace UnityHub.Infrastructure.CommonModel
         public decimal? Longitude { get; set; }
         public string ProfileUrl { get; set; }
         public string PhoneNumber { get; set; }
-        public string Email { get; set; }
+        public string Email { get; set; } // Optional, not used for login
         public string Password { get; set; }
         public string ConfirmPassword { get; set; }
     }
 
     public class ForgotPassword
     {
-        public string Email { get; set; }
+        public string PhoneNumber { get; set; }
     }
 
     public class ResetPassword
     {
         public string Token { get; set; }
-        public string Email { get; set; }
+        public string PhoneNumber { get; set; }
         public string Password { get; set; }
         public string ConfirmPassword { get; set; }
     }
 
     public class ChangeUserPassword
     {
-        public string Email { get; set; }
+        public string PhoneNumber { get; set; }
         public string OldPassword { get; set; }
         public string NewPassword { get; set; }
         public string ConfirmNewPassword { get; set; }
@@ -50,7 +50,7 @@ namespace UnityHub.Infrastructure.CommonModel
 
     public class ReSentVerificationCode
     {
-        public string Email { get; set; }
+        public string PhoneNumber { get; set; }
     }
 
     public class UpdateUserProfile
@@ -61,7 +61,6 @@ namespace UnityHub.Infrastructure.CommonModel
         public string PhoneNumber { get; set; }
         public string Location { get; set; }
         public string ProfileUrl { get; set; }
-        public string Email { get; set; }
         public string Address { get; set; }
         public string City { get; set; }
         public string State { get; set; }

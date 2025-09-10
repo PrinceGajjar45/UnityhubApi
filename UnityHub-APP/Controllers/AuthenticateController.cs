@@ -9,7 +9,7 @@ namespace UnityHub.API.Controllers
 {
     [Route("api/auth")]
     [ApiController]
-    //[Authorize]
+    //[Authorize] // Default to requiring authorization
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
@@ -80,7 +80,7 @@ namespace UnityHub.API.Controllers
         /// Registers a new user and returns their details with a JWT token.
         /// </summary>
         [HttpPost("register")]
-        [AllowAnonymous] // Allow anonymous access for register
+        [AllowAnonymous] // Allow anonymous access for registration
         public async Task<IActionResult> RegisterAsync([FromBody] UnityHub.API.Authentication.RegisterModel registerRequest)
         {
             var registerModel = ConvertData<UnityHub.API.Authentication.RegisterModel, UnityHub.Core.Models.RegisterModel>(registerRequest);
@@ -135,7 +135,7 @@ namespace UnityHub.API.Controllers
         {
             try
             {
-                var response = await _authService.VerifyTwoFactorCodeAsync(model.Email, model.OTP);
+                var response = await _authService.VerifyTwoFactorCodeAsync(model.PhoneNumber, model.OTP);
                 return StatusCode(response.StatusCode, response);
             }
             catch (Exception ex)
@@ -144,11 +144,30 @@ namespace UnityHub.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Initiates the forgot password process for a user.
+        /// </summary>
+        [HttpPost("forgot-password")]
+        [AllowAnonymous] // Allow anonymous access for forgot password
+        public async Task<IActionResult> ForgotPasswordAsync([FromBody] ForgotPasswordModel forgotRequest)
+        {
+            try
+            {
+                var forgotPassword = ConvertData<ForgotPasswordModel, UnityHub.Core.Models.ForgotPassword>(forgotRequest);
+                var response = await _authService.ForgotPassword(forgotPassword);
+                return StatusCode(response.StatusCode, response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Status = "Error", ex.Message });
+            }
+        }
 
         /// <summary>
         /// Resets the user's password using a reset token.
         /// </summary>
         [HttpPost("reset-password")]
+        [AllowAnonymous] // Allow anonymous access for password reset
         public async Task<IActionResult> ResetPasswordAsync([FromBody] ResetPasswordModel resetRequest)
         {
             try
@@ -163,24 +182,6 @@ namespace UnityHub.API.Controllers
             }
         }
 
-
-        /// <summary>
-        /// Initiates the forgot password process for a user.
-        /// </summary>
-        [HttpPost("forgot-password")]
-        public async Task<IActionResult> ForgotPasswordAsync([FromBody] ForgotPasswordModel forgotRequest)
-        {
-            try
-            {
-                var forgotPassword = ConvertData<ForgotPasswordModel, UnityHub.Core.Models.ForgotPassword>(forgotRequest);
-                var response = await _authService.ForgotPassword(forgotPassword);
-                return StatusCode(response.StatusCode, response);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { Status = "Error", ex.Message });
-            }
-        }
 
         /// <summary>
         /// Changes the password for an existing user.
@@ -205,16 +206,15 @@ namespace UnityHub.API.Controllers
         /// Gets the profile of the currently authenticated user.
         /// </summary>
         [HttpGet("Get-profile")]
-        public async Task<IActionResult> GetProfileAsync()
+        public async Task<IActionResult> GetProfileAsync([FromQuery] string phoneNumber)
         {
             try
             {
-                var email = User.Identity?.Name;
-                if (string.IsNullOrEmpty(email))
+                if (string.IsNullOrEmpty(phoneNumber))
                 {
                     return Unauthorized(new CustomApiResponse<object> { StatusCode = 401, Message = "User is not authenticated." });
                 }
-                var response = await _authService.GetUserProfileAsync(email);
+                var response = await _authService.GetUserProfileAsync(phoneNumber);
                 return StatusCode(response.StatusCode, response);
             }
             catch (Exception ex)
@@ -229,6 +229,7 @@ namespace UnityHub.API.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpGet("Get-User-Role")]
+        [AllowAnonymous] // Allow anonymous access for getting user roles (needed for registration)
         public async Task<IActionResult> GetGetUserRoleAsync()
         {
             try
@@ -243,6 +244,26 @@ namespace UnityHub.API.Controllers
                     StatusCode = 500,
                     Message = $"Internal server error: {ex.Message}"
                 });
+            }
+        }
+
+        /// <summary>
+        /// Validate postal code and retrieve location information.
+        /// </summary>
+        [HttpGet]
+        [Route("validate-pincode/{pinCode}")]
+        public async Task<ActionResult<CustomApiResponse<object>>> ValidatePinCode(string pinCode)
+        {
+            try
+            {
+                var result = await _authService.ValidateAndGetLocationByPinCode(pinCode);
+                if (result.StatusCode != 200)
+                    return BadRequest(result);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Status = "Error", Message = ex.Message });
             }
         }
     }

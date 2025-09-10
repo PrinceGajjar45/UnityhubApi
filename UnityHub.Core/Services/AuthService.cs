@@ -16,12 +16,13 @@ namespace UnityHub.Core.Services
     public class AuthService : IAuthService
     {
         private readonly IAuthRepository _authRepository;
+        private readonly PostalService _postalService;
 
         public AuthService(IAuthRepository authRepository)
         {
             _authRepository = authRepository ?? throw new ArgumentNullException(nameof(authRepository));
+            _postalService = new PostalService();
         }
-
 
         public async Task<CustomApiResponse<UserBasicDetails>> LoginAsync(LoginModel model)
         {
@@ -39,15 +40,15 @@ namespace UnityHub.Core.Services
             return ConvertResponse(response, user);
         }
 
-        public async Task<CustomApiResponse<object>> VerifyTwoFactorCodeAsync(string email, string code)
+        public async Task<CustomApiResponse<object>> VerifyTwoFactorCodeAsync(string phoneNumber, string code)
         {
-            var response = await _authRepository.VerifyTwoFactorCodeAsync(email, code);
+            var response = await _authRepository.VerifyTwoFactorCodeAsync(phoneNumber, code);
             return ConvertResponse<object>(response);
         }
 
-        public async Task<CustomApiResponse<object>> ForgotPassword(ForgotPassword email)
+        public async Task<CustomApiResponse<object>> ForgotPassword(ForgotPassword forgotPassword)
         {
-            var infraModel = ConvertData<ForgotPassword, InfrastructureForgotPassword>(email);
+            var infraModel = ConvertData<ForgotPassword, InfrastructureForgotPassword>(forgotPassword);
             var response = await _authRepository.ForgotPassword(infraModel);
             return ConvertResponse<object>(response);
         }
@@ -80,21 +81,25 @@ namespace UnityHub.Core.Services
             return ConvertResponse<object>(response);
         }
 
-        public async Task<CustomApiResponse<UserBasicDetails>> GetUserProfileAsync(string email)
+        public async Task<CustomApiResponse<UserBasicDetails>> GetUserProfileAsync(string phoneNumber)
         {
-            var response = await _authRepository.GetUserProfileAsync(email);
+            var response = await _authRepository.GetUserProfileAsync(phoneNumber);
             var user = MapToUserBasicDetails(response);
             return ConvertResponse(response, user);
         }
 
-        // Better approach: Create a specific response type
         public async Task<CustomApiResponse<List<string>>> GetAllRoleNamesAsync()
         {
             var response = await _authRepository.GetAllRoleNamesAsync();
             return ConvertResponse(response, response.Roles ?? new List<string>());
         }
 
-        // Generic data converter method for mapping between types
+        public async Task<CustomApiResponse<object>> ValidateAndGetLocationByPinCode(string pinCode)
+        {
+            var response = await _postalService.GetLocationDetailsByPinCode(pinCode);
+            return ConvertResponse<object>(response, response.Data);
+        }
+
         private TOut ConvertData<TIn, TOut>(TIn input)
             where TOut : new()
         {
@@ -110,7 +115,6 @@ namespace UnityHub.Core.Services
             return output;
         }
 
-        // Helper to convert Infrastructure.Response to Core.CustomApiResponse<T>
         private CustomApiResponse<T> ConvertResponse<T>(InfrastructureResponse response, T data = default)
         {
             var apiResponse = new CustomApiResponse<T>
@@ -121,7 +125,6 @@ namespace UnityHub.Core.Services
                 Expiration = response.Expiration
             };
 
-            // Handle role data specifically
             if (response.Roles != null && typeof(T) == typeof(List<string>))
             {
                 apiResponse.Data = (T)(object)response.Roles;
@@ -134,7 +137,6 @@ namespace UnityHub.Core.Services
             return apiResponse;
         }
 
-        // Helper to map Infrastructure.Response to UserBasicDetails
         private UserBasicDetails MapToUserBasicDetails(InfrastructureResponse response)
         {
             return new UserBasicDetails
@@ -151,6 +153,5 @@ namespace UnityHub.Core.Services
                 Role = response.Roles != null && response.Roles.Count > 0 ? response.Roles[0] : null
             };
         }
-
     }
 }

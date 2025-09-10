@@ -4,7 +4,11 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
 using UnityHub.API.Mappings;
+using UnityHub.Core.Interface;
+using UnityHub.Core.Services;
 using UnityHub.Infrastructure.Data;
+using UnityHub.Infrastructure.Interface;
+using UnityHub.Infrastructure.Repository;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,10 +36,12 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 .AddDefaultTokenProviders();
 
 // Update DI registrations: register Core service interface to Infrastructure implementation
-builder.Services.AddScoped<UnityHub.Core.Interface.IAuthService, UnityHub.Core.Services.AuthService>();
-builder.Services.AddScoped<UnityHub.Infrastructure.Interface.IAuthRepository, UnityHub.Infrastructure.Repository.AuthRepository>();
-builder.Services.AddScoped<UnityHub.Infrastructure.Repository.AuthRepository>();
-builder.Services.AddTransient<UnityHub.Infrastructure.Interface.IEmailSender<UnityHub.Infrastructure.Data.ApplicationUser>, UnityHub.Infrastructure.Repository.EmailSender>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IAuthRepository, AuthRepository>();
+builder.Services.AddScoped<AuthRepository>();
+builder.Services.AddScoped<IServiceProviderService, ServiceProviderService>();
+builder.Services.AddScoped<IServiceProviderRepository, ServiceProviderRepository>();
+builder.Services.AddTransient<UnityHub.Infrastructure.Interface.IEmailSender<ApplicationUser>, UnityHub.Infrastructure.Repository.EmailSender>();
 builder.Services.AddAutoMapper(cfg =>
 {
     cfg.AddProfile<AuthMappingProfile>();
@@ -48,6 +54,7 @@ builder.Services.Configure<DataProtectionTokenProviderOptions>(options =>
 builder.Services.AddAuthentication()
     .AddJwtBearer(options =>
     {
+        // options.RequireHttpsMetadata = false; // Removed for production security
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
